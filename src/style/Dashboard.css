@@ -1,0 +1,394 @@
+/* ── Dashboard.css ── */
+
+/* Reuse the same CSS variable contract as App.css / PeopleCounter */
+:root {
+    --bg: #0d0f14;
+    --surface: #13161e;
+    --surface-2: #1a1e29;
+    --border: #232737;
+    --text-1: #e8eaf0;
+    --text-2: #9099b0;
+    --text-3: #545c74;
+    --blue: #3b82f6;
+    --blue-dim: #1d3f7a;
+    --green: #22c55e;
+    --green-dim: #14532d;
+    --amber: #f59e0b;
+    --amber-dim: #713f12;
+    --red: #ef4444;
+    --red-dim: #7f1d1d;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  
+  /* ── Layout ── */
+  .dash-root {
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text-1);
+    font-family: "IBM Plex Mono", "Fira Code", monospace;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  /* ── Topbar ── */
+  .dash-topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 24px;
+    height: 52px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  
+  .dash-brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-1);
+  }
+  
+  .dash-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-3);
+    transition: background 0.3s;
+  }
+  .dash-dot.live {
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.5; }
+  }
+  
+  .dash-sep {
+    flex: 1;
+  }
+  
+  .dash-chip {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--text-3);
+    border: 1px solid var(--border);
+  }
+  .dash-chip.green {
+    background: var(--green-dim);
+    color: var(--green);
+    border-color: var(--green);
+  }
+  .dash-chip.amber {
+    background: var(--amber-dim);
+    color: var(--amber);
+    border-color: var(--amber);
+  }
+  .dash-chip.red {
+    background: var(--red-dim);
+    color: var(--red);
+    border-color: var(--red);
+  }
+  .dash-chip.blue {
+    background: var(--blue-dim);
+    color: var(--blue);
+    border-color: var(--blue);
+  }
+  
+  /* ── Main content ── */
+  .dash-main {
+    flex: 1;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-width: 1200px;
+    width: 100%;
+    margin: 0 auto;
+  }
+  
+  /* ── Cards ── */
+  .dash-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  
+  .dash-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  
+  .dash-card-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-2);
+  }
+  
+  .dash-card-badge {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-3);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 2px 8px;
+  }
+  
+  .dash-card-body {
+    padding: 18px;
+  }
+  
+  /* ── Stats row ── */
+  .dash-stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+  
+  @media (max-width: 900px) {
+    .dash-stats-row { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 520px) {
+    .dash-stats-row { grid-template-columns: 1fr; }
+  }
+  
+  .dash-stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .dash-stat.primary {
+    border-color: var(--blue-dim);
+    background: linear-gradient(135deg, var(--surface) 60%, #1a2540);
+  }
+  .dash-stat-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
+  .dash-stat-value {
+    font-size: 40px;
+    font-weight: 700;
+    color: var(--text-1);
+    line-height: 1;
+  }
+  .dash-stat-value.blue  { color: var(--blue); }
+  .dash-stat-value.green { color: var(--green); }
+  .dash-stat-value.amber { color: var(--amber); }
+  .dash-stat-sub {
+    font-size: 11px;
+    color: var(--text-3);
+  }
+  
+  /* ── Mid row ── */
+  .dash-mid-row {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 16px;
+  }
+  @media (max-width: 900px) {
+    .dash-mid-row { grid-template-columns: 1fr; }
+  }
+  
+  /* ── Session info grid ── */
+  .dash-session-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+  .dash-session-cell {
+    background: var(--surface-2);
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .dash-session-cell-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
+  .dash-session-cell-value {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-1);
+  }
+  
+  /* ── Bottom row ── */
+  .dash-bottom-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 800px) {
+    .dash-bottom-row { grid-template-columns: 1fr; }
+  }
+  
+  /* ── Device controls ── */
+  .dash-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .dash-status-line {
+    font-size: 12px;
+    color: var(--text-2);
+  }
+  .dash-status-line b { color: var(--text-1); }
+  .dash-btn-row {
+    display: flex;
+    gap: 8px;
+  }
+  
+  /* ── Buttons ── */
+  .dash-btn {
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    padding: 8px 16px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-1);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+  }
+  .dash-btn:hover:not(:disabled) {
+    background: var(--border);
+  }
+  .dash-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .dash-btn.blue {
+    background: var(--blue);
+    border-color: var(--blue);
+    color: #fff;
+  }
+  .dash-btn.blue:hover:not(:disabled) {
+    background: #2563eb;
+  }
+  .dash-btn.green {
+    background: var(--green);
+    border-color: var(--green);
+    color: #000;
+  }
+  .dash-btn.green:hover:not(:disabled) {
+    background: #16a34a;
+  }
+  .dash-btn.red {
+    background: var(--red-dim);
+    border-color: var(--red);
+    color: var(--red);
+  }
+  .dash-btn.red:hover:not(:disabled) {
+    background: var(--red);
+    color: #fff;
+  }
+  .dash-btn.ghost {
+    background: transparent;
+    color: var(--text-2);
+  }
+  .dash-btn.ghost:hover:not(:disabled) {
+    color: var(--text-1);
+    background: var(--surface-2);
+  }
+  
+  /* ── Form inputs ── */
+  .dash-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .dash-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .dash-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
+  .dash-input,
+  .dash-select {
+    font-family: inherit;
+    font-size: 13px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-1);
+    padding: 9px 12px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .dash-input:focus,
+  .dash-select:focus {
+    border-color: var(--blue);
+  }
+  .dash-input::placeholder {
+    color: var(--text-3);
+  }
+  
+  /* ── Error banner ── */
+  .dash-error {
+    font-size: 12px;
+    color: var(--red);
+    background: var(--red-dim);
+    border: 1px solid var(--red);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+  }
+  
+  /* ── Footer ── */
+  .dash-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    height: 40px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    font-size: 11px;
+    color: var(--text-3);
+  }
+  .dash-footer-right {
+    display: flex;
+    gap: 16px;
+  }
+  .dash-footer-right b { color: var(--text-2); }

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef } from "react";
 
 export interface LogEntry {
   id: number;
@@ -7,101 +7,102 @@ export interface LogEntry {
   timestamp: Date;
 }
 
-export interface SerialState {
-  isConnected: boolean;
-  count: number;
-  totalIn: number;
-  totalOut: number;
-  lastDirection: "IN" | "OUT" | null;
-  log: LogEntry[];
-  irStatus: string;
-  sessionStart: Date | null;
-}
-
 export const useSerial = () => {
-  const [state, setState] = useState<SerialState>({
-    isConnected: false,
-    count: 0,
-    totalIn: 0,
-    totalOut: 0,
-    lastDirection: null,
-    log: [],
-    irStatus: "",
-    sessionStart: null,
-  });
+  const [count, setCount]       = useState(0);
+  const [log, setLog]           = useState<LogEntry[]>([]);
+  const [connected, setConnected] = useState(false);
 
-  const portRef = useRef<SerialPort | null>(null);
-  const readerRef = useRef<ReadableStreamDefaultReader | null>(null);
-  const keepReadingRef = useRef(false);
-  const logIdRef = useRef(0);
+  const portRef      = useRef<SerialPort | null>(null);
+  const readerRef    = useRef<ReadableStreamDefaultReader<string> | null>(null);
+  const bufferRef    = useRef("");          // incomplete line buffer
+  const idRef        = useRef(0);           // auto-increment log entry id
+  const countRef     = useRef(0);           // mirror of count state for use inside closure
 
-  const connect = useCallback(async () => {
+  const connect = async () => {
     try {
       const port = await navigator.serial.requestPort();
       await port.open({ baudRate: 9600 });
+
       portRef.current = port;
-      keepReadingRef.current = true;
-      setState(prev => ({ ...prev, isConnected: true, sessionStart: new Date() }));
+      setConnected(true);
 
-      const textDecoder = new TextDecoderStream();
-      // types for TextDecoderStream.writable don't align with serial API, cast to suppress error
-      port.readable!.pipeTo(textDecoder.writable as unknown as WritableStream<any>).catch(() => {});
-      const reader = textDecoder.readable.getReader();
+      const decoder = new TextDecoderStream();
+      port.readable!.pipeTo(decoder.writable);
+
+      const reader = decoder.readable.getReader();
       readerRef.current = reader;
-      let buffer = "";
+      bufferRef.current = "";
 
-      while (keepReadingRef.current) {
-        try {
-          const { value, done } = await reader.read();
-          if (done) break;
-          if (value) {
-            buffer += value;
-            const lines = buffer.split("\n");
-            buffer = lines.pop() ?? "";
-            lines.forEach(raw => {
-              const line = raw.trim();
-              if (!line) return;
-              if (line === "IN" || line === "OUT") {
-                const dir = line as "IN" | "OUT";
-                setState(prev => {
-                  const newCount = dir === "IN" ? prev.count + 1 : Math.max(0, prev.count - 1);
-                  const entry: LogEntry = {
-                    id: ++logIdRef.current,
-                    direction: dir,
-                    count: newCount,
-                    timestamp: new Date(),
-                  };
-                  return {
-                    ...prev,
-                    count: newCount,
-                    totalIn: dir === "IN" ? prev.totalIn + 1 : prev.totalIn,
-                    totalOut: dir === "OUT" ? prev.totalOut + 1 : prev.totalOut,
-                    lastDirection: dir,
-                    log: [entry, ...prev.log].slice(0, 200),
-                  };
-                });
-              } else {
-                setState(prev => ({ ...prev, irStatus: line }));
-              }
-            });
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        if (!value) continue;
+
+        // Accumulate chunks into buffer, process only complete lines
+        bufferRef.current += value;
+        const lines = bufferRef.current.split("\n");
+        bufferRef.current = lines.pop() ?? ""; // keep incomplete tail
+
+        for (const line of lines) {
+          const msg = line.trim().toUpperCase();
+
+          // Accept both plain "IN"/"OUT" (your Arduino) and "DIR:IN"/"DIR:OUT"
+          let dir: "IN" | "OUT" | null = null;
+          if (msg === "IN" || msg === "DIR:IN")   dir = "IN";
+          if (msg === "OUT" || msg === "DIR:OUT") dir = "OUT";
+          if (!dir) continue; // ignore COUNT:x, STATUS:READY, empty lines
+
+          // Update running count
+          if (dir === "IN") {
+            countRef.current = countRef.current + 1;
+          } else {
+            countRef.current = Math.max(0, countRef.current - 1);
           }
-        } catch { break; }
+
+          const entry: LogEntry = {
+            id:        idRef.current++,
+            direction: dir,
+            count:     countRef.current,
+            timestamp: new Date(),
+          };
+
+          setLog(prev => [entry, ...prev]);
+          setCount(countRef.current);
+        }
       }
-    } catch (err) {
-      console.error("Connection failed:", err);
+    } catch (err: unknown) {
+      // User cancelled port picker — not a real error
+      if (err instanceof Error && err.name !== "NotFoundError") {
+        console.error("Serial error:", err);
+      }
+      setConnected(false);
     }
-  }, []);
+  };
 
-  const disconnect = useCallback(async () => {
-    keepReadingRef.current = false;
-    try { await readerRef.current?.cancel(); } catch {}
-    try { await portRef.current?.close(); } catch {}
-    setState(prev => ({ ...prev, isConnected: false }));
-  }, []);
+  const disconnect = async () => {
+    try {
+      await readerRef.current?.cancel();
+      await portRef.current?.close();
+    } catch {
+      // port may already be closed
+    } finally {
+      portRef.current  = null;
+      readerRef.current = null;
+      countRef.current  = 0;
+      setConnected(false);
+    }
+  };
 
-  const reset = useCallback(() => {
-    setState(prev => ({ ...prev, count: 0, totalIn: 0, totalOut: 0, lastDirection: null, log: [], sessionStart: prev.isConnected ? new Date() : null }));
-  }, []);
+  const reset = () => {
+    countRef.current = 0;
+    idRef.current    = 0;
+    setCount(0);
+    setLog([]);
+  };
 
-  return { state, connect, disconnect, reset };
+  // Expose both LogEntry[] log (for LineChart) and a plain string[] rawLog
+  // (for Dashboard entry/exit counting) so both components work without changes
+  const rawLog = log.map(e => e.direction); // string[] "IN"/"OUT"
+
+  return { count, log, rawLog, connect, disconnect, connected, reset };
 };

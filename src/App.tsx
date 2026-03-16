@@ -1,7 +1,12 @@
-import PeopleCounter from "./components/PeopleCounter";
+
+import Dashboard from "./components/Dashboard";
 
 function App() {
-  return <PeopleCounter />;
+  return (
+    <div>
+      <Dashboard />
+    </div>
+  );
 }
 
 export default App;
