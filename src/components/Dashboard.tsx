@@ -11,21 +11,51 @@ import ThemeToggle from "./ThemeToggle";
 import "../style/Dashboard.css";
 
 export interface CompletedSession {
-  id: number;
-  room: string;
-  year: string;
-  start: string;
-  end: string;
+  id:      number;
+  room:    string;
+  year:    string;
+  start:   string;
+  end:     string;
   entries: number;
-  exits: number;
-  peak: number;
+  exits:   number;
+  peak:    number;
   savedAt: string;
-  source: "auto" | "manual";
-  status: "on-time" | "early" | "extended";
-  reason: string | null;
+  source:  "auto" | "manual";
+  status:  "on-time" | "early" | "extended";
+  reason:  string | null;
 }
 
+type DBSession = {
+  id:      number;
+  room:    string;
+  year:    string;
+  start:   string;
+  end:     string;
+  entries: number;
+  exits:   number;
+  peak:    number;
+  savedAt: string;
+  source:  string;
+  status:  string;
+  reason:  string | null;
+};
+
 const nextIdRef = { current: 1 };
+
+const mapSession = (s: DBSession): CompletedSession => ({
+  id:      s.id,
+  room:    s.room,
+  year:    s.year,
+  start:   s.start,
+  end:     s.end,
+  entries: s.entries,
+  exits:   s.exits,
+  peak:    s.peak,
+  savedAt: s.savedAt,
+  source:  (s.source ?? "auto")    as "auto" | "manual",
+  status:  (s.status ?? "on-time") as "on-time" | "early" | "extended",
+  reason:  s.reason ?? null,
+});
 
 export default function Dashboard() {
   const serial = useSerial();
@@ -37,7 +67,9 @@ export default function Dashboard() {
   const [error,     setError]     = useState<string | null>(null);
   const [loading,   setLoading]   = useState(true);
 
-  const peakRef = useRef(0);
+  const peakRef     = useRef(0);
+  const startingRef = useRef(false);
+
   peakRef.current = Math.max(peakRef.current, serial.count);
 
   const entries = useMemo(() => serial.rawLog.filter(e => e === "IN").length,  [serial.rawLog]);
@@ -48,94 +80,70 @@ export default function Dashboard() {
   const todayStr       = new Date().toISOString().slice(0, 10);
   const formatDatetime = (timeStr: string) => `${todayStr} ${timeStr}:00`;
 
-  // ── Load existing sessions from DB on mount ──
   useEffect(() => {
-    const fetchSessions = async () => {
-      try {
-        const res  = await fetch("http://localhost/website_ar/api/get-sessions.php");
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = await res.json();
+    if (activeId === null) {
+      startingRef.current = false;
+    }
+  }, [activeId]);
 
-        if (json.status === "ok" && Array.isArray(json.sessions)) {
-          const loaded: CompletedSession[] = json.sessions.map((s: {
-            id: number; room: string; year: string;
-            start: string; end: string; entries: number;
-            exits: number; peak: number; savedAt: string;
-          }) => ({
-            id:      s.id,
-            room:    s.room,
-            year:    s.year,
-            start:   s.start,
-            end:     s.end,
-            entries: s.entries,
-            exits:   s.exits,
-            peak:    s.peak,
-            savedAt: s.savedAt,
-            source:  "auto" as const,
-            status:  "on-time" as const,
-            reason:  null,
-          }));
-          setCompleted(loaded);
-        }
-      } catch (err) {
-        console.error("Failed to load sessions:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchSessions = async () => {
+    const res  = await fetch("/api/get-sessions.php");
+    const json = await res.json();
+    if (json.status === "ok" && Array.isArray(json.sessions)) {
+      setCompleted((json.sessions as DBSession[]).map(mapSession));
+    }
+  };
 
-    fetchSessions();
+  useEffect(() => {
+    fetchSessions()
+      .catch(err => console.error("Failed to load sessions:", err))
+      .finally(() => setLoading(false));
   }, []);
 
-  // ── Save to DB ──
   const saveToDB = async (payload: {
-    room: string; year: string; start: string; end: string;
-    entries: number; exits: number; peak: number;
+    room:    string;
+    year:    string;
+    start:   string;
+    end:     string;
+    entries: number;
+    exits:   number;
+    peak:    number;
+    status:  "on-time" | "early" | "extended";
+    reason:  string | null;
   }) => {
-    const body = new URLSearchParams({
-      room:    payload.room,
-      year:    payload.year,
-      start:   payload.start,
-      end:     payload.end,
-      entries: String(payload.entries),
-      exits:   String(payload.exits),
-      peak:    String(payload.peak),
+    const res = await fetch("/api/save-summary.php", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(payload),
     });
 
-    const res = await fetch("http://localhost/website_ar/api/save-summary.php", {
-      method:  "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body,
-    });
+    const text = await res.text();
 
     if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Server error: ${res.status} - ${text}`);
+      throw new Error(`Save failed (${res.status}): ${text}`);
     }
-    return res.json();
+
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error(`Invalid JSON from PHP: ${text}`);
+    }
   };
 
   const handleAdd = (data: Omit<SessionData, "id">) => {
     const [h, m] = data.start.split(":").map(Number);
     const scheduled = new Date();
     scheduled.setHours(h, m, 0, 0);
-    // If time is in the past, push to tomorrow
     if (scheduled.getTime() < Date.now()) {
       scheduled.setDate(scheduled.getDate() + 1);
     }
-  
-    setQueue(prev => [...prev, {
-      id: nextIdRef.current++,
-      ...data,
-      scheduledAt: scheduled.getTime(),
-    }]);
+    setQueue(prev => [...prev, { id: nextIdRef.current++, ...data, scheduledAt: scheduled.getTime() }]);
   };
 
   const handleRemove = (id: number) => {
     setQueue(prev => prev.filter(s => s.id !== id));
   };
 
-  // ── Edit a queued session ──
   const handleEdit = (id: number, data: { room: string; year: string; start: string; end: string }) => {
     const [h, m] = data.start.split(":").map(Number);
     const scheduled = new Date();
@@ -143,18 +151,15 @@ export default function Dashboard() {
     if (scheduled.getTime() < Date.now()) {
       scheduled.setDate(scheduled.getDate() + 1);
     }
-  
     setQueue(prev => prev.map(s =>
-      s.id === id
-        ? { ...s, ...data, scheduledAt: scheduled.getTime() }
-        : s
+      s.id === id ? { ...s, ...data, scheduledAt: scheduled.getTime() } : s
     ));
-  
-    // Allow the session to re-fire after edit
-    // (access firedRef via a ref passed down or handle in SessionQueue)
   };
+
   const handleStart = (id: number) => {
     if (activeId !== null) return;
+    if (startingRef.current) return;
+    startingRef.current = true;
     peakRef.current = 0;
     serial.reset();
     setActiveId(id);
@@ -167,24 +172,11 @@ export default function Dashboard() {
     const now       = new Date();
     const actualEnd = now.toISOString().slice(0, 19).replace("T", " ");
 
-    const payload = {
-      room:    activeSession.room,
-      year:    activeSession.year,
-      start:   formatDatetime(activeSession.start),
-      end:     actualEnd,
-      entries,
-      exits,
-      peak:    peakRef.current,
-    };
-
     setSaving(true);
     setError(null);
 
     try {
-      const saved = await saveToDB(payload);
-
-      setCompleted(prev => [...prev, {
-        id:      saved.session_id ?? activeSession.id,
+      await saveToDB({
         room:    activeSession.room,
         year:    activeSession.year,
         start:   formatDatetime(activeSession.start),
@@ -192,11 +184,11 @@ export default function Dashboard() {
         entries,
         exits,
         peak:    peakRef.current,
-        savedAt: actualEnd,
-        source:  "auto",
         status,
         reason,
-      }]);
+      });
+
+      await fetchSessions();
 
       setQueue(prev => prev.filter(s => s.id !== activeSession.id));
       setActiveId(null);
@@ -216,43 +208,35 @@ export default function Dashboard() {
     const session = queue.find(s => s.id === id);
     if (!session) return;
 
-    const payload = {
-      room:    session.room,
-      year:    session.year,
-      start:   formatDatetime(session.start),
-      end:     formatDatetime(data.end),
-      entries: parseInt(data.entries),
-      exits:   parseInt(data.exits),
-      peak:    parseInt(data.peak),
-    };
-
     setSaving(true);
     setError(null);
 
     try {
-      const saved = await saveToDB(payload);
-
-      setCompleted(prev => [...prev, {
-        id:      saved.session_id ?? id,
+      await saveToDB({
         room:    session.room,
         year:    session.year,
-        start:   session.start,
-        end:     data.end,
+        start:   formatDatetime(session.start),
+        end:     formatDatetime(data.end),
         entries: parseInt(data.entries),
         exits:   parseInt(data.exits),
         peak:    parseInt(data.peak),
-        savedAt: new Date().toLocaleTimeString("en-US", { hour12: false }),
-        source:  "manual",
         status:  "on-time",
         reason:  null,
-      }]);
+      });
 
+      await fetchSessions();
       setQueue(prev => prev.filter(s => s.id !== id));
+
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save session.");
     } finally {
       setSaving(false);
     }
+  };
+
+  // ── Remove deleted session from local state immediately ──
+  const handleDeleteSession = (id: number) => {
+    setCompleted(prev => prev.filter(s => s.id !== id));
   };
 
   return (
@@ -291,7 +275,6 @@ export default function Dashboard() {
               onConnect={serial.connect}
               onDisconnect={serial.disconnect}
             />
-
             <div className="dash-card">
               <div className="dash-card-head">
                 <div className="dash-card-title">Add Session</div>
@@ -300,20 +283,20 @@ export default function Dashboard() {
                 <SessionCreator onAdd={handleAdd} />
               </div>
             </div>
-
-            {activeSession && (
-              <ActiveSession
-                session={activeSession}
-                peak={peakRef.current}
-                entries={entries}
-                exits={exits}
-                saving={saving}
-                error={error}
-                onEnd={handleEnd}
-              />
-            )}
           </div>
         </div>
+
+        {activeSession && (
+          <ActiveSession
+            session={activeSession}
+            peak={peakRef.current}
+            entries={entries}
+            exits={exits}
+            saving={saving}
+            error={error}
+            onEnd={handleEnd}
+          />
+        )}
 
         <SessionQueue
           queue={queue}
@@ -329,7 +312,10 @@ export default function Dashboard() {
             Loading sessions…
           </div>
         ) : (
-          <CompletedSessions sessions={completed} />
+          <CompletedSessions
+            sessions={completed}
+            onDelete={handleDeleteSession}
+          />
         )}
       </main>
 

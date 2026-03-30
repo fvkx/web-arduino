@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import type { SessionData } from "./SessionCreator";
 
-// Convert "HH:MM" to total minutes since midnight
 const toMinutes = (t: string) => {
   const [h, m] = t.split(":").map(Number);
   return h * 60 + m;
@@ -36,12 +35,12 @@ interface Props {
 export default function ActiveSession({
   session, peak, entries, exits, saving, error, onEnd,
 }: Props) {
-  const [nowTime,       setNowTime]       = useState("");
-  const [status,        setStatus]        = useState<"on-time" | "early" | "extended">("on-time");
-  const [showModal,     setShowModal]     = useState(false);
+  const [nowTime,        setNowTime]        = useState("");
+  const [status,         setStatus]         = useState<"on-time" | "early" | "extended">("on-time");
+  const [showModal,      setShowModal]      = useState(false);
   const [selectedReason, setSelectedReason] = useState("");
-  const [customReason,  setCustomReason]  = useState("");
-  const [reasonErr,     setReasonErr]     = useState<string | null>(null);
+  const [customReason,   setCustomReason]   = useState("");
+  const [reasonErr,      setReasonErr]      = useState<string | null>(null);
 
   // Live clock + status detection
   useEffect(() => {
@@ -55,14 +54,13 @@ export default function ActiveSession({
       });
       setNowTime(timeStr);
 
-      // Compare current time to scheduled end (HH:MM)
       const nowMin = now.getHours() * 60 + now.getMinutes();
       const endMin = toMinutes(session.end);
       const diff   = nowMin - endMin;
 
       if (diff > 2)       setStatus("extended");
-      else if (diff < -2) setStatus("on-time"); // still within window
-      // we only flip to "early" when user clicks End — not on a timer
+      else if (diff < -2) setStatus("early");    // ← fixed
+      else                setStatus("on-time");
     };
     tick();
     const id = setInterval(tick, 1000);
@@ -75,15 +73,12 @@ export default function ActiveSession({
     const diff   = nowMin - endMin;
 
     if (diff > 2) {
-      // Running over scheduled end
       setStatus("extended");
       setShowModal(true);
     } else if (diff < -2) {
-      // Ending before scheduled end
       setStatus("early");
       setShowModal(true);
     } else {
-      // On time — no modal needed
       onEnd(null, "on-time");
     }
   };
@@ -104,22 +99,25 @@ export default function ActiveSession({
   };
 
   const isOverdue = status === "extended";
+  const isEarly   = status === "early";
   const reasons   = status === "early" ? EARLY_REASONS : EXTENDED_REASONS;
 
-  // Status color for the scheduled end cell
   const endColor = isOverdue
     ? "var(--red)"
-    : status === "early"
+    : isEarly
       ? "var(--amber)"
       : "var(--text-1)";
 
   return (
     <>
-      <div className="dash-card" style={{ borderColor: isOverdue ? "var(--red-dim)" : "var(--blue-dim)" }}>
+      <div className="dash-card" style={{
+        borderColor: isOverdue ? "var(--red-dim)" : isEarly ? "var(--amber-dim)" : "var(--blue-dim)",
+      }}>
         <div className="dash-card-head">
           <div className="dash-card-title">Active Session</div>
           <div style={{ display: "flex", gap: 6 }}>
             {isOverdue && <div className="dash-chip red">Overtime</div>}
+            {isEarly   && <div className="dash-chip amber">Ending Early</div>}
             <div className="dash-chip green">Live</div>
           </div>
         </div>
@@ -140,16 +138,30 @@ export default function ActiveSession({
             </div>
           )}
 
+          {/* Early warning banner */}
+          {isEarly && (
+            <div style={{
+              background:   "var(--amber-dim)",
+              border:       "1px solid var(--amber)",
+              borderRadius: 6,
+              padding:      "8px 12px",
+              fontSize:     12,
+              color:        "var(--amber)",
+            }}>
+              ⚠ Session is ending before its scheduled end time ({session.end}). Current time: {nowTime}.
+            </div>
+          )}
+
           <div className="dash-session-grid">
             {[
-              { label: "Room",    value: session.room  },
-              { label: "Year",    value: session.year  },
-              { label: "Start",   value: session.start },
+              { label: "Room",       value: session.room  },
+              { label: "Year",       value: session.year  },
+              { label: "Start",      value: session.start },
               { label: "Sched. End", value: session.end, color: endColor },
-              { label: "Now",     value: nowTime       },
-              { label: "Entries", value: entries       },
-              { label: "Exits",   value: exits         },
-              { label: "Peak",    value: peak          },
+              { label: "Now",        value: nowTime       },
+              { label: "Entries",    value: entries       },
+              { label: "Exits",      value: exits         },
+              { label: "Peak",       value: peak          },
             ].map(({ label, value, color }) => (
               <div key={label} className="dash-session-cell">
                 <div className="dash-session-cell-label">{label}</div>
@@ -168,7 +180,7 @@ export default function ActiveSession({
             disabled={saving}
             style={{ width: "100%" }}
           >
-            {saving ? "Saving\u2026" : "End Session & Save"}
+            {saving ? "Saving…" : "End Session & Save"}
           </button>
 
         </div>
@@ -187,17 +199,16 @@ export default function ActiveSession({
           zIndex:         100,
         }}>
           <div style={{
-            background:   "var(--surface)",
-            border:       "1px solid var(--border)",
-            borderRadius: 12,
-            padding:      24,
-            width:        "100%",
-            maxWidth:     400,
-            display:      "flex",
-            flexDirection:"column",
-            gap:          16,
+            background:    "var(--surface)",
+            border:        "1px solid var(--border)",
+            borderRadius:  12,
+            padding:       24,
+            width:         "100%",
+            maxWidth:      400,
+            display:       "flex",
+            flexDirection: "column",
+            gap:           16,
           }}>
-            {/* Modal header */}
             <div>
               <div style={{
                 fontSize:      11,
@@ -216,7 +227,6 @@ export default function ActiveSession({
               </div>
             </div>
 
-            {/* Reason options */}
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {reasons.map(r => (
                 <label
@@ -247,7 +257,6 @@ export default function ActiveSession({
               ))}
             </div>
 
-            {/* Custom reason input */}
             {selectedReason === "Other" && (
               <div className="dash-field">
                 <label className="dash-label">Describe the reason</label>
@@ -263,7 +272,6 @@ export default function ActiveSession({
 
             {reasonErr && <div className="dash-error">{reasonErr}</div>}
 
-            {/* Modal actions */}
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 className="dash-btn red"
@@ -271,7 +279,7 @@ export default function ActiveSession({
                 onClick={handleConfirm}
                 disabled={saving}
               >
-                {saving ? "Saving\u2026" : "Confirm & Save"}
+                {saving ? "Saving…" : "Confirm & Save"}
               </button>
               <button className="dash-btn ghost" onClick={handleCancel}>
                 Cancel

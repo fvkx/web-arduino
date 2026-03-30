@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 interface CompletedSession {
   id:      number;
   room:    string;
@@ -14,7 +16,8 @@ interface CompletedSession {
 }
 
 interface Props {
-  sessions: CompletedSession[];
+  sessions:  CompletedSession[];
+  onDelete?: (id: number) => void;
 }
 
 const STATUS_STYLES: Record<string, { bg: string; color: string; border: string; label: string }> = {
@@ -23,8 +26,34 @@ const STATUS_STYLES: Record<string, { bg: string; color: string; border: string;
   "extended": { bg: "var(--red-dim)",   color: "var(--red)",   border: "var(--red)",   label: "Overtime" },
 };
 
-export default function CompletedSessions({ sessions }: Props) {
+export default function CompletedSessions({ sessions, onDelete }: Props) {
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
   if (sessions.length === 0) return null;
+
+  const handleDelete = async (id: number) => {
+    const confirmed = confirm("Delete this session record? This cannot be undone.");
+    if (!confirmed) return;
+
+    setDeletingId(id);
+    try {
+      const res = await fetch("/api/delete-session.php", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ id }),
+      });
+      const json = await res.json();
+      if (json.status === "ok") {
+        onDelete?.(id);
+      } else {
+        alert("Failed to delete: " + (json.message ?? "Unknown error"));
+      }
+    } catch {
+      alert("Network error while deleting session.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   return (
     <div className="dash-card">
@@ -33,27 +62,26 @@ export default function CompletedSessions({ sessions }: Props) {
         <div className="dash-card-badge">{sessions.length} saved</div>
       </div>
 
-      {/* Outer: horizontal scroll. Inner: vertical scroll with sticky header */}
       <div style={{ overflowX: "auto" }}>
         <div style={{ maxHeight: 360, overflowY: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                {["Source", "Status", "Room", "Year", "Time", "Entries", "Exits", "Peak", "Reason", "Saved"].map(h => (
+                {["Status", "Purpose", "Year", "Time", "Entries", "Exits", "Peak", "Reason", "Saved", ""].map(h => (
                   <th key={h} style={{
-                    padding:         "8px 14px",
-                    textAlign:       "left",
-                    fontSize:        10,
-                    fontWeight:      600,
-                    letterSpacing:   "0.08em",
-                    textTransform:   "uppercase",
-                    color:           "var(--text-3)",
-                    whiteSpace:      "nowrap",
-                    position:        "sticky",
-                    top:             0,
-                    background:      "var(--surface)",
-                    zIndex:          1,
-                    borderBottom:    "1px solid var(--border)",
+                    padding:       "8px 14px",
+                    textAlign:     "left",
+                    fontSize:      10,
+                    fontWeight:    600,
+                    letterSpacing: "0.08em",
+                    textTransform: "uppercase",
+                    color:         "var(--text-3)",
+                    whiteSpace:    "nowrap",
+                    position:      "sticky",
+                    top:           0,
+                    background:    "var(--surface)",
+                    zIndex:        1,
+                    borderBottom:  "1px solid var(--border)",
                   }}>
                     {h}
                   </th>
@@ -71,25 +99,18 @@ export default function CompletedSessions({ sessions }: Props) {
                       background:   idx % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)",
                     }}
                   >
-                    {/* Source */}
-                    <td style={{ padding: "10px 14px" }}>
-                      <span style={{
-                        fontSize: 10, fontWeight: 600, letterSpacing: "0.06em",
-                        textTransform: "uppercase", padding: "2px 7px", borderRadius: 999,
-                        background: s.source === "auto" ? "var(--green-dim)" : "var(--amber-dim)",
-                        color:      s.source === "auto" ? "var(--green)"     : "var(--amber)",
-                        border:     `1px solid ${s.source === "auto" ? "var(--green)" : "var(--amber)"}`,
-                      }}>
-                        {s.source === "auto" ? "Auto" : "Manual"}
-                      </span>
-                    </td>
-
                     {/* Status */}
                     <td style={{ padding: "10px 14px" }}>
                       <span style={{
-                        fontSize: 10, fontWeight: 600, letterSpacing: "0.06em",
-                        textTransform: "uppercase", padding: "2px 7px", borderRadius: 999,
-                        background: st.bg, color: st.color, border: `1px solid ${st.border}`,
+                        fontSize:      10,
+                        fontWeight:    600,
+                        letterSpacing: "0.06em",
+                        textTransform: "uppercase",
+                        padding:       "2px 7px",
+                        borderRadius:  999,
+                        background:    st.bg,
+                        color:         st.color,
+                        border:        `1px solid ${st.border}`,
                       }}>
                         {st.label}
                       </span>
@@ -117,6 +138,18 @@ export default function CompletedSessions({ sessions }: Props) {
                     </td>
 
                     <td style={{ padding: "10px 14px", color: "var(--text-3)", whiteSpace: "nowrap" }}>{s.savedAt}</td>
+
+                    {/* Delete */}
+                    <td style={{ padding: "10px 14px" }}>
+                      <button
+                        className="dash-btn ghost"
+                        style={{ color: "var(--red)", padding: "2px 8px", fontSize: 11 }}
+                        disabled={deletingId === s.id}
+                        onClick={() => handleDelete(s.id)}
+                      >
+                        {deletingId === s.id ? "…" : "✕"}
+                      </button>
+                    </td>
                   </tr>
                 );
               })}

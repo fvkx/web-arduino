@@ -25,10 +25,9 @@ const LineChart: React.FC<Props> = ({ log }) => {
 
     if (log.length < 2) return;
 
-    const pts = [...log]
-      .reverse()
-      .slice(0, 40)
-      .map((e) => e.count);
+    // ✅ Fix: slice first (latest 40), then reverse for left→right drawing order
+    const window40 = [...log].slice(0, 40).reverse();
+    const pts = window40.map((e) => e.count);
     const maxV = Math.max(...pts, 1);
 
     const pL = 30,
@@ -87,7 +86,7 @@ const LineChart: React.FC<Props> = ({ log }) => {
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Last point dot
+    // Last point dot — now correctly the most recent value
     const lx = x(pts.length - 1),
       ly = y(pts[pts.length - 1]);
     ctx.beginPath();
@@ -100,13 +99,13 @@ const LineChart: React.FC<Props> = ({ log }) => {
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // X-axis time labels (first / last)
+    // X-axis time labels — oldest on left, newest on right
     if (log.length >= 2) {
-      const oldest = [...log].reverse()[0];
-      const newest = log[0];
+      const oldest = window40[0];                  // left side  (oldest of the window)
+      const newest = window40[window40.length - 1]; // right side (most recent)
       const fmt = (d: Date) =>
         d.toLocaleTimeString("en-US", {
-          hour: "2-digit",
+          hour:   "2-digit",
           minute: "2-digit",
           second: "2-digit",
           hour12: false,

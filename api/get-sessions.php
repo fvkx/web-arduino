@@ -1,4 +1,6 @@
 <?php
+ini_set('display_errors', 0);
+error_reporting(0);
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type");
@@ -21,6 +23,9 @@ $result = $conn->query("
         s.year_level,
         s.start_time,
         s.end_time,
+        s.status,
+        s.reason,
+        s.source,
         s.created_at,
         COALESCE(ss.total_entries,  0) AS total_entries,
         COALESCE(ss.total_exits,    0) AS total_exits,
@@ -43,6 +48,9 @@ while ($row = $result->fetch_assoc()) {
         "year"    => $row["year_level"],
         "start"   => $row["start_time"],
         "end"     => $row["end_time"],
+        "status"  => $row["status"]  ?? "on-time",
+        "reason"  => $row["reason"],
+        "source"  => $row["source"]  ?? "auto",
         "entries" => (int)$row["total_entries"],
         "exits"   => (int)$row["total_exits"],
         "peak"    => (int)$row["peak_occupancy"],

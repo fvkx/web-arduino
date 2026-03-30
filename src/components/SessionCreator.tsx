@@ -33,10 +33,10 @@ export default function SessionCreator({ onAdd }: Props) {
   return (
     <div className="dash-form">
       <div className="dash-field">
-        <label className="dash-label">Room</label>
+        <label className="dash-label">Purpose</label>
         <input
           className="dash-input"
-          placeholder="e.g. Room 101"
+          placeholder="e.g. Meeting"
           value={room}
           onChange={e => setRoom(e.target.value)}
         />

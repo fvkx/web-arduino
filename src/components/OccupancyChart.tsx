@@ -10,23 +10,26 @@ const OccupancyChart: React.FC<Props> = ({ log }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<ChartType | null>(null);
 
+  // log is newest-first — reverse so chart draws oldest→newest (left→right)
   const chartData = useMemo(() =>
-    log.map(entry => ({
-      time: entry.timestamp.toLocaleTimeString('en-US', { hour12: false }),
+    [...log].reverse().map(entry => ({
+      time:  entry.timestamp.toLocaleTimeString('en-US', { hour12: false }),
       count: entry.count,
     })),
     [log]
   );
 
   const counts = chartData.map(d => d.count);
-  const peak = counts.length ? Math.max(...counts) : 0;
-  const avg = counts.length ? Math.round(counts.reduce((a, b) => a + b, 0) / counts.length) : 0;
-  const current = counts.length ? counts[counts.length - 1] : 0;
+  const peak    = counts.length ? Math.max(...counts)                                        : 0;
+  const avg     = counts.length ? Math.round(counts.reduce((a, b) => a + b, 0) / counts.length) : 0;
+
+  // log[0] is the latest entry — its count is current occupancy
+  const current = log.length ? log[0].count : 0;
 
   useEffect(() => {
     if (!canvasRef.current) return;
 
-    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const isDark    = window.matchMedia('(prefers-color-scheme: dark)').matches;
     const lineColor = '#378ADD';
     const fillColor = isDark ? 'rgba(55,138,221,0.12)' : 'rgba(55,138,221,0.08)';
     const gridColor = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
@@ -37,33 +40,33 @@ const OccupancyChart: React.FC<Props> = ({ log }) => {
       data: {
         labels: chartData.map(d => d.time),
         datasets: [{
-          data: chartData.map(d => d.count),
-          borderColor: lineColor,
-          borderWidth: 2,
-          pointRadius: 4,
-          pointHoverRadius: 6,
+          data:                 chartData.map(d => d.count),
+          borderColor:          lineColor,
+          borderWidth:          2,
+          pointRadius:          4,
+          pointHoverRadius:     6,
           pointBackgroundColor: lineColor,
-          pointBorderColor: isDark ? '#1a1a1a' : '#ffffff',
-          pointBorderWidth: 2,
-          fill: true,
-          backgroundColor: fillColor,
-          tension: 0.4,
+          pointBorderColor:     isDark ? '#1a1a1a' : '#ffffff',
+          pointBorderWidth:     2,
+          fill:                 true,
+          backgroundColor:      fillColor,
+          tension:              0.4,
         }],
       },
       options: {
-        responsive: true,
+        responsive:          true,
         maintainAspectRatio: false,
         plugins: { legend: { display: false }, tooltip: { enabled: true } },
         scales: {
           x: {
-            grid: { color: gridColor },
-            ticks: { color: tickColor, font: { size: 11 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 },
+            grid:   { color: gridColor },
+            ticks:  { color: tickColor, font: { size: 11 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 8 },
             border: { display: false },
           },
           y: {
-            min: 0,
-            grid: { color: gridColor },
-            ticks: { color: tickColor, font: { size: 11 }, maxTicksLimit: 5 },
+            min:    0,
+            grid:   { color: gridColor },
+            ticks:  { color: tickColor, font: { size: 11 }, maxTicksLimit: 5 },
             border: { display: false },
           },
         },
@@ -71,11 +74,10 @@ const OccupancyChart: React.FC<Props> = ({ log }) => {
     };
 
     if (chartRef.current) {
-      chartRef.current.data.labels = config.data.labels;
-      chartRef.current.data.datasets[0].data = config.data.datasets[0].data;
+      chartRef.current.data.labels              = config.data.labels;
+      chartRef.current.data.datasets[0].data    = config.data.datasets[0].data;
       chartRef.current.update();
     } else {
-      // Dynamic import avoids the need for window.Chart and keeps types clean
       import('chart.js').then(({ Chart, registerables }) => {
         Chart.register(...registerables);
         if (canvasRef.current) {

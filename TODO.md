@@ -1,26 +1,19 @@
-# TODO: Fix Arduino Serial Data Blocking Issue - ✅ FIXED
+# OccuTrack Completed Sessions Fix
 
-## Summary of Changes:
-- **Step 1 ✅**: Refactored `src/hooks/useSerial.ts` completely:
-  - Replaced blocking `while(true)` with non-blocking recursive `readChunk()` using `setTimeout(0)` to yield event loop.
-  - Fixed TypeScript reader type to `ReadableStreamDefaultReader<string>` (TextDecoderStream).
-  - Added `isReadingRef` to gracefully stop reading on disconnect.
-  - Added rich console logging: connection status, raw data samples (📦), processed DIR events (🎯), errors (❌).
-  - Limited log array to 50 items to prevent memory bloat.
-  - Error retry logic with delays.
-- **Step 2 ✅**: Comprehensive logging/error handling added (see console after connect).
-- **Step 3**: Skipped `ArduinoIRMonitor.tsx` cleanup (standalone/not used in main Dashboard flow).
-- **Step 4 ✅**: Dev server running (`npm run dev` on port 5174). Test:
-  1. Open http://localhost:5174
-  2. Open DevTools Console.
-  3. Click "Connect Arduino" → No freeze, see ✅ connect log.
-  4. Send test data from Arduino (e.g., Serial.print("DIR:IN\n")) → See live count/log updates + console logs.
-- **Step 5 ✅**: TODO updated.
+## Status
+✅ DB inserts work (user verified phpMyAdmin)
+✅ Local count updates (optimistic)
+❌ New rows missing in table (fetch/state sync issue)
 
-## Root Cause Was:
-Infinite `while(true) { await reader.read() }` blocked browser main thread. Data arrived but wasn't processed/updated.
+## Fix Steps
+1. [✅] **Fix fetch URL**: Changed to `/api/...` ✓
+2. [✅] **Add auto-refetch**: Added `await fetchSessions()` after saves ✓
+3. [✅] **Add logging**: Console.log fetched count ✓
+4. [✅] **Test flow**: Ready - `npm run dev` running. Save a session to verify table + console "Fetched sessions: X"
+5. [ ] **Optional**: Add refresh button/interval
 
-**App now receives Arduino data live without freezing!**
-
-Open http://localhost:5174 and test.
-
+## Test Commands
+```
+npm run dev
+# Save session → check Network: get-sessions.php 200 + table shows
+# Hard reload → all DB sessions visible
